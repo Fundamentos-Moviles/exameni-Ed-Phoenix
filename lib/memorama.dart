@@ -11,18 +11,23 @@ class _MemoramaState extends State<Memorama> {
   List<Color> colors = [];
   List<int> revealed = [];
   List<bool> found = List.filled(20, false);
+  int numPairs = 10; // Número base de pares de colores
 
   @override
   void initState() {
     super.initState();
-    _generateColors();
+    _generateColors(20);
   }
 
-  void _generateColors() {
+  void _generateColors(int totalItems) {
     final random = UniqueKey().hashCode;
-    final List<Color> baseColors = List.generate(10, (i) => Color((random + i * 123456) | 0xFF000000));
+    int pairs = (totalItems / 2).floor();
+    final List<Color> baseColors = List.generate(pairs, (i) => Color((random + i * 123456) | 0xFF000000));
     colors = [...baseColors, ...baseColors];
+    colors = colors.take(totalItems).toList();
     colors.shuffle();
+    found = List.filled(totalItems, false);
+    revealed.clear();
   }
 
   void _onTap(int index) async {
@@ -69,28 +74,77 @@ class _MemoramaState extends State<Memorama> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Memorama --- Benitez Lozano Eduardo Carlos')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Memorama --- Benitez Lozano Eduardo Carlos',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.refresh, size: 28, color: Colors.black),
+              label: const Text(
+                'Reiniciar',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                setState(() {
+                  // Se recalcula el número de cuadros al reiniciar
+                  revealed.clear();
+                  found = List.filled(colors.length, false);
+                  _generateColors(colors.length);
+                });
+              },
+            ),
+          ],
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 1,
-          ),
-          itemCount: 20,
-          itemBuilder: (context, index) {
-            final isRevealed = revealed.contains(index) || found[index];
-            return GestureDetector(
-              onTap: () => _onTap(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  color: isRevealed ? colors[index] : Colors.grey[400],
-                  borderRadius: BorderRadius.circular(8),
-                ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            double gridWidth = constraints.maxWidth;
+            double gridHeight = constraints.maxHeight;
+            int crossAxisCount = 4;
+            double spacing = 10;
+            double itemSize = (gridWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+            int numRows = (gridHeight / (itemSize + spacing)).floor();
+            int totalItems = crossAxisCount * numRows;
+            if (colors.length != totalItems) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                setState(() {
+                  _generateColors(totalItems);
+                });
+              });
+            }
+            return GridView.builder(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: spacing,
+                mainAxisSpacing: spacing,
+                childAspectRatio: 1,
               ),
+              itemCount: colors.length,
+              itemBuilder: (context, index) {
+                final isRevealed = revealed.contains(index) || found[index];
+                return GestureDetector(
+                  onTap: () => _onTap(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: itemSize,
+                    height: itemSize,
+                    decoration: BoxDecoration(
+                      color: isRevealed ? colors[index] : Colors.grey[400],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
